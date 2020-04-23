@@ -41,15 +41,12 @@ func main() {
 	}
 
 	//fmt.Println(s3Client)
+	s3Client := s3.New(sess)
 
 	if prefix == true {
-		s3Client := s3.New(sess, &aws.Config{
-			DisableRestProtocolURICleaning: aws.Bool(true),
-		})
 		prefix_a := strings.Split(bucket, "/")
 		DownloadPrefix(s3Client, *bucket, *prefix_a[1], *baseDir, *concurrency, *queueSize)
 	} else {
-		s3Client := s3.New(sess)
 		DownloadBucket(s3Client, *bucket, *baseDir, *concurrency, *queueSize)
 	}
 }
@@ -133,7 +130,11 @@ type PrefixCopier struct {
 }
 
 func (c *PrefixCopier) Copy(key string) (int64, error) {
-	op, err := c.client.GetObjectWithContext(context.Background(), &s3.GetObject(&s3.GetObjectInput{
+	svc := s3.New(sess, &aws.Config{
+		DisableRestProtocolURICleaning: aws.Bool(true),
+	})
+
+	op, err := c.client.GetObjectWithContext(context.Background(), svc.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
 		Key:    aws.String(c.prefix_a),
 	}), func(r *request.Request) {
