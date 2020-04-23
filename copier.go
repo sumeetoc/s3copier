@@ -43,8 +43,8 @@ func main() {
 	//fmt.Println(s3Client)
 	s3Client := s3.New(sess)
 
-	if prefix == true {
-		prefix_a := strings.Split(*bucket, "/")
+	if *prefix == true {
+		prefix_a := strings.Split(bucket, "/")
 		DownloadPrefix(s3Client, *bucket, prefix_a[1], *baseDir, *concurrency, *queueSize)
 	} else {
 		DownloadBucket(s3Client, *bucket, *baseDir, *concurrency, *queueSize)
