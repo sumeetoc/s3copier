@@ -26,7 +26,7 @@ var baseDir = flag.String("baseDir", "", "Directory to copy s3 contents to. (req
 var bucket = flag.String("bucket", "", "S3 Bucket to copy contents from. (required)")
 var concurrency = flag.Int("concurrency", 10, "Number of concurrent connections to use.")
 var queueSize = flag.Int("queueSize", 100, "Size of the queue")
-var prefix = flag.String("prefix", false, "Set `true` if downloading a prefix (required)")
+var prefix = flag.Bool("prefix", false, "Set `true` if downloading a prefix (required)")
 
 func main() {
 	flag.Parse()
@@ -39,17 +39,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create a new session. %v", err)
 	}
-	
+
 	//fmt.Println(s3Client)
 
 	if prefix == true {
 		s3Client := s3.New(sess, &aws.Config{
 			DisableRestProtocolURICleaning: aws.Bool(true),
-	 })
+		})
 		prefix_a := strings.Split(bucket, "/")
-		DownloadPrefix(s3Client, *bucket, *prefix_a, *baseDir, *concurrency, *queueSize)
-	}
-	else {
+		DownloadPrefix(s3Client, *bucket, *prefix_a[1], *baseDir, *concurrency, *queueSize)
+	} else {
 		s3Client := s3.New(sess)
 		DownloadBucket(s3Client, *bucket, *baseDir, *concurrency, *queueSize)
 	}
@@ -58,10 +57,10 @@ func main() {
 func DownloadPrefix(client *s3.S3, bucket, prefix_a string, baseDir string, concurrency, queueSize int) {
 	keysChan := make(chan string, queueSize)
 	cpyr := &PrefixCopier{ //calling copier function, copier function returns every objects attributes(md5,etc), the returning attributes are stored in cpyr. Moreover Copyier returns slice of data using Copy()
-		client:  client,
-		bucket:  bucket,
+		client:   client,
+		bucket:   bucket,
 		prefix_a: prefix_a,
-		baseDir: baseDir,
+		baseDir:  baseDir,
 		bufPool: &sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 1024*16) //make allocates a type 'byte' of space and keeps it ready to be used, probably through a channel
@@ -124,21 +123,22 @@ func DownloadPrefix(client *s3.S3, bucket, prefix_a string, baseDir string, conc
 	}
 	wg.Wait()
 }
+
 type PrefixCopier struct {
-	client  *s3.S3
-	bucket  string
-	prefix_a  string
-	baseDir string
-	bufPool *sync.Pool
+	client   *s3.S3
+	bucket   string
+	prefix_a string
+	baseDir  string
+	bufPool  *sync.Pool
 }
 
 func (c *PrefixCopier) Copy(key string) (int64, error) {
-	op, err := c.client.GetObjectWithContext(context.Background(), &s3.GetObject(&s3.GetObjectInput {
+	op, err := c.client.GetObjectWithContext(context.Background(), &s3.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
-		 Key: aws.String(c.prefix_a),
- }), func(r *request.Request) {
-	r.HTTPRequest.Header.Add("Accept-Encoding", "gzip")
-})
+		Key:    aws.String(c.prefix_a),
+	}), func(r *request.Request) {
+		r.HTTPRequest.Header.Add("Accept-Encoding", "gzip")
+	})
 	//print op, it has the attributes of objects
 	if err != nil {
 		return 0, err
