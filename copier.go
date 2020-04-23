@@ -26,7 +26,7 @@ var baseDir = flag.String("baseDir", "", "Directory to copy s3 contents to. (req
 var bucket = flag.String("bucket", "", "S3 Bucket to copy contents from. (required)")
 var concurrency = flag.Int("concurrency", 10, "Number of concurrent connections to use.")
 var queueSize = flag.Int("queueSize", 100, "Size of the queue")
-var prefix = flag.Bool("prefix", false, "Set `true` if downloading a prefix (required)")
+var prefix = flag.String("prefix", "", "prefix to file excluding bucket name")
 
 func main() {
 	flag.Parse()
@@ -43,20 +43,23 @@ func main() {
 	//fmt.Println(s3Client)
 	s3Client := s3.New(sess)
 
-	if *prefix == true {
-		prefixA := strings.Split(bucket, "/")
-		DownloadPrefix(s3Client, *bucket, prefixA[1], *baseDir, *concurrency, *queueSize)
+	if len(*prefix) != 0 {
+		// prefix := strings.Split(bucket, "/")
+		s3Client := s3.New(sess, &aws.Config{
+			DisableRestProtocolURICleaning: aws.Bool(true),
+		})
+		DownloadPrefix(s3Client, *bucket, *prefix, *baseDir, *concurrency, *queueSize)
 	} else {
 		DownloadBucket(s3Client, *bucket, *baseDir, *concurrency, *queueSize)
 	}
 }
 
-func DownloadPrefix(client *s3.S3, bucket, prefixA string, baseDir string, concurrency, queueSize int) {
+func DownloadPrefix(client *s3.S3, bucket, prefix, baseDir string, concurrency, queueSize int) {
 	keysChan := make(chan string, queueSize)
 	cpyr := &PrefixCopier{ //calling copier function, copier function returns every objects attributes(md5,etc), the returning attributes are stored in cpyr. Moreover Copyier returns slice of data using Copy()
 		client:  client,
 		bucket:  bucket,
-		prefixA: prefixA,
+		prefix:  prefix,
 		baseDir: baseDir,
 		bufPool: &sync.Pool{
 			New: func() interface{} {
@@ -124,20 +127,15 @@ func DownloadPrefix(client *s3.S3, bucket, prefixA string, baseDir string, concu
 type PrefixCopier struct {
 	client  *s3.S3
 	bucket  string
-	prefixA string
+	prefix  string
 	baseDir string
 	bufPool *sync.Pool
 }
 
 func (c *PrefixCopier) Copy(key string) (int64, error) {
-
-	s3 := s3.New(sess, &aws.Config{
-		DisableRestProtocolURICleaning: aws.Bool(true),
-	})
-
 	op, err := c.client.GetObjectWithContext(context.Background(), &s3.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
-		Key:    aws.String(c.prefixA),
+		Key:    aws.String(c.prefix),
 	}), func(r *request.Request) {
 		r.HTTPRequest.Header.Add("Accept-Encoding", "gzip")
 	})
