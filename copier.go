@@ -133,7 +133,7 @@ type PrefixCopier struct {
 }
 
 func (c *PrefixCopier) Copy(key string) (int64, error) {
-	op, err := c.client.GetObjectWithContext(context.Background(), &s3.GetObject(&s3.GetObjectInput{
+	op, err := c.client.GetObjectWithContext(context.Background(), c.client.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
 		Key:    aws.String(c.prefix),
 	}), func(r *request.Request) {
