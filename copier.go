@@ -44,20 +44,20 @@ func main() {
 	s3Client := s3.New(sess)
 
 	if *prefix == true {
-		prefix_a := strings.Split(bucket, "/")
-		DownloadPrefix(s3Client, *bucket, prefix_a[1], *baseDir, *concurrency, *queueSize)
+		prefixA := strings.Split(bucket, "/")
+		DownloadPrefix(s3Client, *bucket, prefixA[1], *baseDir, *concurrency, *queueSize)
 	} else {
 		DownloadBucket(s3Client, *bucket, *baseDir, *concurrency, *queueSize)
 	}
 }
 
-func DownloadPrefix(client *s3.S3, bucket, prefix_a string, baseDir string, concurrency, queueSize int) {
+func DownloadPrefix(client *s3.S3, bucket, prefixA string, baseDir string, concurrency, queueSize int) {
 	keysChan := make(chan string, queueSize)
 	cpyr := &PrefixCopier{ //calling copier function, copier function returns every objects attributes(md5,etc), the returning attributes are stored in cpyr. Moreover Copyier returns slice of data using Copy()
-		client:   client,
-		bucket:   bucket,
-		prefix_a: prefix_a,
-		baseDir:  baseDir,
+		client:  client,
+		bucket:  bucket,
+		prefixA: prefixA,
+		baseDir: baseDir,
 		bufPool: &sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 1024*16) //make allocates a type 'byte' of space and keeps it ready to be used, probably through a channel
@@ -122,26 +122,22 @@ func DownloadPrefix(client *s3.S3, bucket, prefix_a string, baseDir string, conc
 }
 
 type PrefixCopier struct {
-	client   *s3.S3
-	bucket   string
-	prefix_a string
-	baseDir  string
-	bufPool  *sync.Pool
+	client  *s3.S3
+	bucket  string
+	prefixA string
+	baseDir string
+	bufPool *sync.Pool
 }
 
 func (c *PrefixCopier) Copy(key string) (int64, error) {
-	sess, err := session.NewSession()
-	if err != nil {
-		log.Fatalf("Failed to create a new session. %v", err)
-	}
 
-	svc := s3.New(sess, &aws.Config{
+	s3 := s3.New(sess, &aws.Config{
 		DisableRestProtocolURICleaning: aws.Bool(true),
 	})
 
-	op, err := c.client.GetObjectWithContext(context.Background(), svc.GetObject(&s3.GetObjectInput{
+	op, err := c.client.GetObjectWithContext(context.Background(), &s3.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
-		Key:    aws.String(c.prefix_a),
+		Key:    aws.String(c.prefixA),
 	}), func(r *request.Request) {
 		r.HTTPRequest.Header.Add("Accept-Encoding", "gzip")
 	})
